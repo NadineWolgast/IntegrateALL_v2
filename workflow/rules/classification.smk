@@ -66,22 +66,34 @@ rule allcatchr:
         touch {output.predictions} {output.scores} {output.confidence}
         """
 
-# Karyotype prediction using machine learning
+# Karyotype prediction using original trained classifier
 rule karyotype_prediction:
     input:
-        cnv_results="results/cnv/{sample}/rnaseqcnv_results.tsv"
+        allcatchr_pred="results/classification/{sample}/allcatchr_predictions.tsv",
+        cnv_results="results/cnv/{sample}/rnaseqcnv_results.tsv",
+        fusioncatcher_results="results/fusions/{sample}/fusioncatcher_results.txt",
+        arriba_results="results/fusions/{sample}/arriba_fusions.tsv",
+        anno_gene_fusions="resources/databases/anno_gene_fusions.txt"
     output:
-        prediction="results/classification/{sample}/karyotype_prediction.csv",
-        features="results/classification/{sample}/karyotype_features.csv"
+        prediction="results/classification/{sample}/karyotype_prediction.csv"
     params:
-        model_file=config.get("karyotype_model", "resources/models/karyotype_model.pkl"),
-        extra_args=config.get("karyotype_args", "")
+        chromosome_counts_karyotype="resources/databases/chromosome_counts_karyotype.txt"
     log:
         "logs/classification/karyotype_{sample}.log"
     conda:
-        "../envs/python.yaml"
-    script:
-        "../scripts/predict_karyotype.py"
+        "../envs/classification.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/predict_karyotype.R \\
+            {input.allcatchr_pred} \\
+            {input.cnv_results} \\
+            {input.fusioncatcher_results} \\
+            {input.arriba_results} \\
+            {params.chromosome_counts_karyotype} \\
+            {input.anno_gene_fusions} \\
+            {output.prediction} \\
+            > {log} 2>&1
+        """
 
 # Integrative classification combining all results
 rule integrated_classification:
