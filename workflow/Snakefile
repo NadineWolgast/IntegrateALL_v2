@@ -24,6 +24,7 @@ include: "rules/fusion_detection.smk"
 include: "rules/variant_calling.smk"
 include: "rules/cnv_analysis.smk"
 include: "rules/classification.smk"
+include: "rules/original_classification.smk"  # CRITICAL: Original research validation
 include: "rules/reporting.smk"
 include: "rules/installation.smk"
 
@@ -64,12 +65,21 @@ rule all:
         # Variant calling
         expand("results/variants/{sample}/filtered_variants.vcf", sample=SAMPLES),
         
-        # Hotspot analysis
-        expand("results/variants/{sample}/hotspots.csv", sample=SAMPLES),
+        # SNV Hotspot detection (CRITICAL for classification)
+        expand("results/variants/{sample}/snv_hotspots_summary.csv", sample=SAMPLES),
         
-        # Final reports
-        expand("results/reports/{sample}/{sample}_final_report.html", sample=SAMPLES),
-        expand("results/reports/{sample}/{sample}_summary.json", sample=SAMPLES),
+        # Original classification system (CRITICAL for research validity)
+        expand("results/classification/{sample}/final_classification_report.csv", sample=SAMPLES),
+        expand("results/classification/{sample}/driver_fusions.csv", sample=SAMPLES),
+        expand("results/classification/{sample}/curation_summary.csv", sample=SAMPLES),
+        
+        # Interactive HTML reports (original format)
+        expand("results/reports/{sample}/{sample}_interactive_report.html", sample=SAMPLES),
+        expand("results/reports/{sample}/{sample}_classification_summary.json", sample=SAMPLES),
+        
+        # Combined classification summary
+        "results/reports/all_samples_classification_summary.csv",
+        "results/reports/classification_statistics.json",
         
         # Pipeline summary
         "results/reports/pipeline_summary.html"
