@@ -11,7 +11,12 @@ import numpy as np
 import json
 import sys
 from pathlib import Path
-import vcf
+try:
+    from cyvcf2 import VCF
+    HAS_CYVCF2 = True
+except ImportError:
+    print("Warning: cyvcf2 not available, using basic VCF parsing")
+    HAS_CYVCF2 = False
 
 def load_hotspot_regions(hotspot_bed_file):
     """Load hotspot regions from BED file"""
@@ -80,35 +85,43 @@ def parse_vcf_file(vcf_file):
     """Parse VCF file and extract variant information"""
     variants = []
     
+    if HAS_CYVCF2:
+        return parse_vcf_with_cyvcf2(vcf_file)
+    else:
+        return parse_vcf_basic(vcf_file)
+
+def parse_vcf_with_cyvcf2(vcf_file):
+    """Parse VCF file using cyvcf2 (modern, fast approach)"""
+    variants = []
+    
     try:
-        vcf_reader = vcf.Reader(open(vcf_file, 'r'))
+        vcf_reader = VCF(vcf_file)
         
-        for record in vcf_reader:
+        for variant in vcf_reader:
             variant_info = {
-                'chromosome': str(record.CHROM),
-                'position': record.POS,
-                'ref': record.REF,
-                'alt': str(record.ALT[0]) if record.ALT else '',
-                'quality': record.QUAL if record.QUAL else 0,
-                'filter': ';'.join(record.FILTER) if record.FILTER else 'PASS',
-                'info': dict(record.INFO)
+                'chromosome': str(variant.CHROM),
+                'position': variant.POS,
+                'ref': variant.REF,
+                'alt': str(variant.ALT[0]) if variant.ALT else '',
+                'quality': variant.QUAL if variant.QUAL else 0,
+                'filter': variant.FILTER if variant.FILTER else 'PASS',
+                'info': dict(variant.INFO)
             }
             
             # Extract sample-specific information
-            if record.samples:
-                sample = record.samples[0]
+            if len(variant.gt_types) > 0:
                 variant_info.update({
-                    'genotype': sample.gt_type if hasattr(sample, 'gt_type') else None,
-                    'depth': sample.data.DP if hasattr(sample.data, 'DP') else None,
-                    'allele_depth': sample.data.AD if hasattr(sample.data, 'AD') else None
+                    'genotype': variant.gt_types[0],
+                    'depth': variant.gt_depths[0] if variant.gt_depths else None,
+                    'allele_depth': variant.gt_alt_depths[0] if variant.gt_alt_depths else None
                 })
             
             # Extract gene annotation if available
-            if 'ANN' in record.INFO:
-                annotations = record.INFO['ANN']
+            if 'ANN' in variant.INFO:
+                annotations = variant.INFO['ANN']
                 if annotations:
                     # Parse first annotation
-                    ann_fields = annotations[0].split('|')
+                    ann_fields = annotations.split('|') if isinstance(annotations, str) else annotations[0].split('|')
                     if len(ann_fields) > 3:
                         variant_info['gene'] = ann_fields[3]
                         variant_info['effect'] = ann_fields[1]
@@ -117,7 +130,47 @@ def parse_vcf_file(vcf_file):
             variants.append(variant_info)
             
     except Exception as e:
-        print(f"Error parsing VCF file {vcf_file}: {e}")
+        print(f"Error parsing VCF file with cyvcf2 {vcf_file}: {e}")
+        # Fallback to basic parsing
+        return parse_vcf_basic(vcf_file)
+    
+    return variants
+
+def parse_vcf_basic(vcf_file):
+    """Basic VCF parsing as fallback"""
+    variants = []
+    
+    try:
+        with open(vcf_file, 'r') as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                
+                fields = line.strip().split('\t')
+                if len(fields) < 8:
+                    continue
+                
+                variant_info = {
+                    'chromosome': fields[0],
+                    'position': int(fields[1]),
+                    'ref': fields[3],
+                    'alt': fields[4],
+                    'quality': float(fields[5]) if fields[5] != '.' else 0,
+                    'filter': fields[6] if fields[6] != '.' else 'PASS',
+                    'info': {}
+                }
+                
+                # Parse INFO field
+                info_pairs = fields[7].split(';')
+                for pair in info_pairs:
+                    if '=' in pair:
+                        key, value = pair.split('=', 1)
+                        variant_info['info'][key] = value
+                
+                variants.append(variant_info)
+                
+    except Exception as e:
+        print(f"Error in basic VCF parsing {vcf_file}: {e}")
     
     return variants
 

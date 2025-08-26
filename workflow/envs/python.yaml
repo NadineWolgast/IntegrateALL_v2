@@ -30,8 +30,9 @@ dependencies:
   - bcftools>=1.18
   - vcftools>=0.1.16
   - pip
+  # Modern VCF handling
+  - cyvcf2>=0.30.0
   - pip:
     - jinja2>=3.0.0
     - markdown>=3.4.0
     - pybedtools>=0.9.0
-    - pyvcf>=0.6.8
