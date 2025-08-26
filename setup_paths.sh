@@ -71,13 +71,65 @@ configure_paths() {
     echo "   Conda: $conda_path"
     echo ""
     
-    # Update submit_pipeline.sh
-    if [ -f "submit_pipeline.sh" ]; then
-        log_info "Aktualisiere submit_pipeline.sh..."
-        sed -i "s|^cd \".*IntegrateALL.*\"|cd \"$base_path\"|g" submit_pipeline.sh
-        sed -i "s|source \".*conda.sh\"|source \"$conda_path/etc/profile.d/conda.sh\"|g" submit_pipeline.sh
-        log_success "submit_pipeline.sh aktualisiert"
-    fi
+    # Create/update submit_pipeline.sh
+    local submit_script="submit_pipeline.sh"
+    log_info "Erstelle SLURM Submit-Script..."
+    
+    cat > "$submit_script" << EOF
+#!/bin/bash
+#SBATCH --job-name=IntegrateALL_v2
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=8G
+#SBATCH --qos=long
+#SBATCH --time=7-00:00:00
+#SBATCH --output=integrateall_%j.out
+#SBATCH --error=integrateall_%j.err
+
+# Auto-configured paths
+echo "Pipeline Directory: $base_path"
+echo "Conda Base: $conda_path"
+echo "User: \$(whoami)"
+echo "Host: \$(hostname)"
+echo "Date: \$(date)"
+echo ""
+
+# Activate Conda (auto-detected)
+if [ -f "$conda_path/etc/profile.d/conda.sh" ]; then
+    source "$conda_path/etc/profile.d/conda.sh"
+else
+    echo "Warning: Could not find conda.sh at $conda_path"
+    export PATH="$conda_path/bin:\$PATH"
+fi
+
+# Activate Pipeline Environment
+conda activate integrateall
+
+# Change to Pipeline Directory
+cd "$base_path"
+
+# Create logs directory
+mkdir -p logs
+
+# Run Pipeline with SLURM
+snakemake \\
+    --snakefile workflow/Snakefile \\
+    --cluster "sbatch -t {cluster.time} -c {cluster.cores} --mem={cluster.memory} -p {cluster.partition} -o logs/slurm-%j.out -e logs/slurm-%j.err" \\
+    --cluster-config config/cluster.yaml \\
+    --use-conda \\
+    --conda-prefix .snakemake/conda \\
+    --cores 32 \\
+    --jobs 42 \\
+    --keep-going \\
+    --rerun-triggers mtime \\
+    --latency-wait 60 \\
+    --restart-times 3 \\
+    --printshellcmds
+EOF
+
+    chmod +x "$submit_script"
+    log_success "SLURM Submit-Script erstellt: $submit_script"
     
     # Update activate_pipeline.sh  
     if [ -f "activate_pipeline.sh" ]; then
