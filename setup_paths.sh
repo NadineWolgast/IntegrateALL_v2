@@ -131,6 +131,97 @@ EOF
     chmod +x "$submit_script"
     log_success "SLURM Submit-Script erstellt: $submit_script"
     
+    # Create cluster configuration
+    local cluster_config="config/cluster.yaml"
+    log_info "Erstelle Cluster-Konfiguration..."
+    
+    cat > "$cluster_config" << EOF
+# Auto-generated SLURM Cluster Configuration
+# Pipeline Directory: $base_path
+# Generated: $(date)
+
+__default__:
+  cores: 1
+  memory: "4G"
+  time: "01:00:00"
+  partition: "base"
+
+# Quality Control
+fastqc:
+  cores: 2
+  memory: "8G"
+  time: "30:00"
+
+multiqc:
+  cores: 1
+  memory: "4G"
+  time: "30:00"
+
+# Alignment (Resource-intensiv)
+star_index:
+  cores: 16
+  memory: "60G"
+  time: "02:00:00"
+  partition: "base"
+
+star_align:
+  cores: 16
+  memory: "60G"
+  time: "04:00:00"
+  partition: "base"
+
+# GATK Variant Calling
+gatk_add_read_groups:
+  cores: 4
+  memory: "16G"
+  time: "02:00:00"
+
+gatk_mark_duplicates:
+  cores: 4
+  memory: "16G"
+  time: "02:00:00"
+
+gatk_split_n_cigar_reads:
+  cores: 4
+  memory: "16G"
+  time: "03:00:00"
+
+gatk_haplotype_caller:
+  cores: 8
+  memory: "32G"
+  time: "06:00:00"
+
+gatk_variant_filtration:
+  cores: 2
+  memory: "8G"
+  time: "01:00:00"
+
+# Fusion Detection
+arriba:
+  cores: 8
+  memory: "32G"
+  time: "02:00:00"
+
+# Classification & Analysis
+allcatchr:
+  cores: 4
+  memory: "16G"
+  time: "01:00:00"
+
+rnaseqcnv:
+  cores: 4
+  memory: "16G"
+  time: "02:00:00"
+
+# Reporting
+generate_reports:
+  cores: 2
+  memory: "8G"
+  time: "30:00"
+EOF
+
+    log_success "Cluster-Konfiguration erstellt: $cluster_config"
+    
     # Update activate_pipeline.sh  
     if [ -f "activate_pipeline.sh" ]; then
         log_info "Aktualisiere activate_pipeline.sh..."
