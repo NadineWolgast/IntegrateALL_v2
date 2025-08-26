@@ -1,0 +1,134 @@
+"""
+IntegrateALL Pipeline - Main Snakefile
+======================================
+
+Comprehensive B-ALL RNA-seq analysis pipeline with improved performance and modularity.
+
+"""
+
+import sys
+import os
+from pathlib import Path
+import pandas as pd
+
+# Import configuration
+configfile: "config/config.yaml"
+
+# Validate configuration
+include: "rules/common.smk"
+
+# Import all rule modules
+include: "rules/qc.smk"
+include: "rules/alignment.smk" 
+include: "rules/fusion_detection.smk"
+include: "rules/variant_calling.smk"
+include: "rules/cnv_analysis.smk"
+include: "rules/classification.smk"
+include: "rules/reporting.smk"
+include: "rules/installation.smk"
+
+# Global wildcard constraints
+wildcard_constraints:
+    sample="[A-Za-z0-9_-]+",
+    read="[12]"
+
+# Load and validate samples
+samples_df = load_samples(config["samples"])
+SAMPLES = samples_df["sample_id"].tolist()
+
+# Set up resource specifications
+if "resources" in config:
+    include: "rules/resources.smk"
+
+# Define target rule
+rule all:
+    input:
+        # Quality control
+        expand("results/qc/multiqc/{sample}_multiqc_report.html", sample=SAMPLES),
+        
+        # Alignment QC
+        expand("results/alignment/{sample}/{sample}.flagstat", sample=SAMPLES),
+        
+        # Fusion detection
+        expand("results/fusions/{sample}/arriba_fusions.tsv", sample=SAMPLES),
+        # FusionCatcher disabled due to installation issues
+        # expand("results/fusions/{sample}/fusioncatcher_results.txt", sample=SAMPLES),
+        
+        # Classification
+        expand("results/classification/{sample}/allcatchr_predictions.tsv", sample=SAMPLES),
+        expand("results/classification/{sample}/karyotype_prediction.csv", sample=SAMPLES),
+        
+        # CNV analysis  
+        expand("results/cnv/{sample}/rnaseqcnv_results.tsv", sample=SAMPLES),
+        
+        # Variant calling
+        expand("results/variants/{sample}/filtered_variants.vcf", sample=SAMPLES),
+        
+        # Hotspot analysis
+        expand("results/variants/{sample}/hotspots.csv", sample=SAMPLES),
+        
+        # Final reports
+        expand("results/reports/{sample}/{sample}_final_report.html", sample=SAMPLES),
+        expand("results/reports/{sample}/{sample}_summary.json", sample=SAMPLES),
+        
+        # Pipeline summary
+        "results/reports/pipeline_summary.html"
+
+# Optional rules for development and testing
+rule dry_run:
+    """Perform a dry run to check workflow"""
+    shell:
+        "snakemake --dry-run --quiet"
+
+rule test:
+    """Run pipeline tests"""
+    shell:
+        "python -m pytest .tests/"
+
+rule clean:
+    """Clean up temporary files"""
+    shell:
+        """
+        rm -rf results/temp/
+        rm -rf logs/temp/
+        find results/ -name "*.tmp" -delete
+        find logs/ -name "*.tmp" -delete
+        """
+
+rule clean_all:
+    """Clean all results (use with caution)"""
+    shell:
+        """
+        rm -rf results/
+        rm -rf logs/
+        rm -rf benchmarks/
+        mkdir -p results logs benchmarks
+        """
+
+# Error handling
+onerror:
+    print("An error occurred. Check logs for details.")
+    shell("tail -n 20 logs/snakemake.log")
+
+# Success message
+onsuccess:
+    print("Pipeline completed successfully!")
+    print(f"Results are available in: {os.path.abspath('results')}")
+    shell("python workflow/scripts/generate_pipeline_summary.py")
+
+# Cleanup temporary files on success
+if config.get("cleanup_temp", True):
+    onsuccess:
+        shell("find results/temp/ -name '*.tmp' -delete 2>/dev/null || true")
+
+# Performance monitoring
+if config.get("benchmark", False):
+    rule benchmark_summary:
+        input:
+            expand("benchmarks/{rule}_{sample}.benchmark.txt", 
+                   rule=["star_align", "arriba", "fusioncatcher", "gatk_call", "allcatchr"],
+                   sample=SAMPLES)
+        output:
+            "results/reports/benchmark_summary.html"
+        script:
+            "scripts/summarize_benchmarks.py"

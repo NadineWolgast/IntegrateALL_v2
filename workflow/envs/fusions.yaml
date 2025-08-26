@@ -1,0 +1,13 @@
+name: integrateall_fusions
+channels:
+  - bioconda
+  - conda-forge
+  - r
+  - defaults
+dependencies:
+  - arriba=2.4.0
+  - fusioncatcher=1.33
+  - r-base=4.2
+  - r-circlize
+  - r-genomicalignments
+  - r-genomicranges

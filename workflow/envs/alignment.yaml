@@ -1,0 +1,9 @@
+name: integrateall_alignment
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - star=2.7.10a
+  - samtools=1.18
+  - picard=3.0.0

@@ -1,0 +1,59 @@
+# Pipeline outputs and temporary files
+results/
+logs/
+benchmarks/
+.snakemake/
+**/temp/
+**/*.tmp
+**/*.log
+
+# Large data files (keep structure, ignore content)
+*.fastq.gz
+*.fastq
+*.fq.gz  
+*.fq
+*.bam
+*.bai
+*.sam
+*.vcf.gz
+*.vcf
+*.fa
+*.fasta
+*.fna
+*.gtf.gz
+*.gtf
+*.gff
+*.gff3
+
+# Reference databases (too large for git)
+resources/genomes/*
+resources/databases/*
+# But keep directory structure
+!resources/genomes/.gitkeep
+!resources/databases/.gitkeep
+
+# Conda environments and caches
+.snakemake/conda/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# R files
+.RData
+.Rhistory
+*.Rproj
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Temporary test files
+test_*
+*_test.*

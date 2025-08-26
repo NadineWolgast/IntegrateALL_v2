@@ -1,0 +1,102 @@
+# IntegrateALL Pipeline Configuration
+# ====================================
+
+# Sample information
+samples: "config/samples.tsv"
+
+# Reference genome files
+reference_genome: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+reference_gtf: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/genomes/Homo_sapiens.GRCh38.109.gtf"
+
+# Output directory
+output_dir: "results"
+
+# Resource allocation
+threads: 16
+memory_gb: 32
+star_align_memory: 40000  # MB for STAR alignment
+star_index_memory: 32000  # MB for STAR indexing
+
+# Quality control settings
+fastqc_args: "--quiet"
+multiqc_args: "--force --quiet"
+
+# STAR alignment settings
+star_index_threads: 16
+star_align_threads: 16
+star_read_files_command: "zcat"  # Use "cat" for uncompressed FASTQ
+star_two_pass_mode: "Basic"
+star_chim_segment_min: 15
+star_chim_junction_overhang_min: 15
+sjdb_overhang: 100
+
+# Fusion detection settings
+arriba_threads: 4
+arriba_memory: 16000
+fusioncatcher_threads: 16
+fusioncatcher_memory: 64000
+fusion_min_support: 3
+
+# Variant calling settings (GATK)
+gatk_memory: 16000
+gatk_threads: 8
+
+# CNV analysis settings
+rnaseqcnv_memory: 16000
+rnaseqcnv_threads: 4
+
+# Classification settings
+allcatchr_memory: 8000
+allcatchr_model: "default"
+classification_confidence_threshold: 0.7
+
+# Database paths (update these to your local paths)
+databases:
+  arriba_blacklist: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/databases/arriba/blacklist_hg38_GRCh38_v2.4.0.tsv.gz"
+  arriba_known_fusions: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/databases/arriba/known_fusions_hg38_GRCh38_v2.4.0.tsv.gz"
+  arriba_protein_domains: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/databases/arriba/protein_domains_hg38_GRCh38_v2.4.0.gff3"
+  arriba_cytobands: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/databases/arriba/cytobands_hg38_GRCh38_v2.4.0.tsv"
+  fusioncatcher_data: "resources/databases/fusioncatcher/human_v102"
+  dbsnp_rda: "resources/databases/dbSNP_hg38.rda"
+  driver_gene_list: "/media/nadine/InternalMaybe/IntegrateALL_pipeline/resources/databases/driver_genes.txt"
+  gene_annotations: "resources/databases/gene_annotations.gtf"
+  oncogene_list: "resources/databases/oncogenes.txt"
+  tumor_suppressor_list: "resources/databases/tumor_suppressors.txt"
+
+# Advanced settings
+cleanup_temp: true
+benchmark: true
+enable_drug_prediction: false
+enable_risk_stratification: true
+
+# Runtime limits (in minutes)
+runtimes:
+  fastqc_runtime: 30
+  star_align_runtime: 240
+  star_index_runtime: 120
+  arriba_runtime: 120
+  fusioncatcher_runtime: 480
+  gatk_runtime: 180
+  rnaseqcnv_runtime: 120
+  allcatchr_runtime: 60
+
+# Filtering thresholds
+thresholds:
+  min_mapping_quality: 20
+  min_base_quality: 20
+  min_variant_frequency: 0.05
+  max_variant_frequency: 0.95
+  focal_cnv_threshold: 3000000  # 3Mb
+  broad_cnv_threshold: 50000000  # 50Mb
+  instability_threshold: 0.2
+
+# Singularity settings (optional)
+singularity:
+  use_singularity: false
+  singularity_prefix: "/path/to/singularity/images"
+
+# Cluster settings (for SLURM/PBS)
+cluster:
+  partition: "normal"
+  account: "your_account"
+  max_jobs: 100

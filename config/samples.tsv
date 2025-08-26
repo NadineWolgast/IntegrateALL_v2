@@ -1,0 +1,2 @@
+sample_id	fastq1	fastq2	condition	batch
+test_sample	/media/nadine/InternalMaybe/Blast-o-Matic-Fusioninator_cluster/data/samples/min_read_1.fastq.gz	/media/nadine/InternalMaybe/Blast-o-Matic-Fusioninator_cluster/data/samples/min_read_2.fastq.gz	B-ALL	batch1
