@@ -71,10 +71,27 @@ def validate_config(config):
         'reference_gtf': config.get('reference_gtf')
     }
     
-    for name, path in ref_files.items():
-        if path and not os.path.exists(path):
-            print(f"Reference file not found - {name}: {path}")
-            sys.exit(1)
+    # Skip validation for installation/download rules
+    import sys
+    skip_validation_targets = [
+        'install_all', 'download_references', 'install_conda_setup',
+        'install_r_packages', 'install_references', 'download_genome',
+        'download_gtf', 'create_star_index'
+    ]
+    
+    # Check if we're running installation targets
+    if len(sys.argv) > 1:
+        target_rules = [arg for arg in sys.argv if not arg.startswith('-')]
+        skip_validation = any(target in skip_validation_targets for target in target_rules)
+    else:
+        skip_validation = False
+    
+    if not skip_validation:
+        for name, path in ref_files.items():
+            if path and not os.path.exists(path):
+                print(f"Reference file not found - {name}: {path}")
+                print(f"Run 'snakemake --cores 4 --use-conda download_references' first")
+                sys.exit(1)
     
     # Set default values
     config.setdefault('threads', 8)
