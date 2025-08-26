@@ -86,6 +86,24 @@ configure_paths() {
         log_success "activate_pipeline.sh aktualisiert"
     fi
     
+    # Update config.yaml with correct paths
+    if [ -f "config/config.yaml" ]; then
+        log_info "Aktualisiere config.yaml Pfade..."
+        
+        # Update reference genome paths
+        sed -i "s|^reference_genome:.*|reference_genome: \"$base_path/resources/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa\"|g" config/config.yaml
+        sed -i "s|^reference_gtf:.*|reference_gtf: \"$base_path/resources/genomes/Homo_sapiens.GRCh38.109.gtf\"|g" config/config.yaml
+        
+        # Update database paths
+        sed -i "s|arriba_blacklist:.*|arriba_blacklist: \"$base_path/resources/databases/arriba/blacklist_hg38_GRCh38_v2.4.0.tsv.gz\"|g" config/config.yaml
+        sed -i "s|arriba_known_fusions:.*|arriba_known_fusions: \"$base_path/resources/databases/arriba/known_fusions_hg38_GRCh38_v2.4.0.tsv.gz\"|g" config/config.yaml
+        sed -i "s|arriba_protein_domains:.*|arriba_protein_domains: \"$base_path/resources/databases/arriba/protein_domains_hg38_GRCh38_v2.4.0.gff3\"|g" config/config.yaml
+        sed -i "s|arriba_cytobands:.*|arriba_cytobands: \"$base_path/resources/databases/arriba/cytobands_hg38_GRCh38_v2.4.0.tsv\"|g" config/config.yaml
+        sed -i "s|driver_gene_list:.*|driver_gene_list: \"$base_path/resources/databases/driver_genes.txt\"|g" config/config.yaml
+        
+        log_success "config.yaml Pfade aktualisiert"
+    fi
+    
     # Create/update sample template
     log_info "Erstelle Sample-Template..."
     cat > "config/samples_template.tsv" << EOF
