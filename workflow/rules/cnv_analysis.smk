@@ -5,7 +5,7 @@ Copy Number Variation Analysis Rules for IntegrateALL Pipeline
 RNASeqCNV analysis for chromosomal alteration detection in B-ALL
 """
 
-# RNASeqCNV analysis
+# RNASeqCNV analysis using modified wrapper
 rule rnaseqcnv:
     input:
         counts="results/alignment/{sample}/{sample}.counts_formatted.tsv",
@@ -15,12 +15,11 @@ rule rnaseqcnv:
         plot="results/cnv/{sample}/cnv_plot.png", 
         log2fc="results/cnv/{sample}/log2_fold_change_per_arm.tsv",
         manual_table="results/cnv/{sample}/manual_annotation_table.tsv",
-        estimation_table="results/cnv/{sample}/estimation_table.tsv"
+        estimation_table="results/cnv/{sample}/estimation_table.tsv",
+        cnv_features="results/cnv/{sample}/cnv_features.csv"  # For ensemble classifier
     params:
         output_dir="results/cnv/{sample}",
-        dbsnp_file=config.get("dbsnp_rda", "resources/databases/dbSNP_hg38.rda"),
-        reference_counts=config.get("rnaseqcnv_reference", "resources/databases/rnaseqcnv_reference_counts.rda"),
-        extra_args=config.get("rnaseqcnv_args", "")
+        sample_id="{sample}"
     resources:
         mem_mb=config.get("rnaseqcnv_memory", 16000),
         runtime=config.get("rnaseqcnv_runtime", 120)
@@ -30,93 +29,8 @@ rule rnaseqcnv:
         "benchmarks/cnv/rnaseqcnv_{sample}.benchmark.txt"
     conda:
         "../envs/cnv.yaml"
-    shell:
-        """
-        # Create output directory
-        mkdir -p {params.output_dir}
-        
-        # Run RNASeqCNV analysis using R script
-        Rscript -e "
-        library(RNAseqCNV)
-        library(vcfR)
-        
-        # Set output directory
-        setwd('{params.output_dir}')
-        
-        # Load gene expression data
-        counts <- read.table('{input.counts}', header=TRUE, sep='\\t', row.names=1)
-        
-        # Process VCF file for SNP data
-        if(file.size('{input.vcf}') > 0) {{
-            vcf_data <- read.vcfR('{input.vcf}')
-            # Convert VCF to format suitable for RNAseqCNV
-            snp_data <- vcfR2tidy(vcf_data)
-        }} else {{
-            snp_data <- NULL
-        }}
-        
-        # Load dbSNP data
-        if(file.exists('{params.dbsnp_file}')) {{
-            load('{params.dbsnp_file}')
-        }}
-        
-        # Run RNASeqCNV analysis
-        sample_id <- '{wildcards.sample}'
-        
-        # Prepare count data (ensure proper formatting)
-        count_matrix <- as.matrix(counts)
-        colnames(count_matrix) <- sample_id
-        
-        # Run CNV estimation
-        cnv_result <- RNAseqCNV(
-            counts = count_matrix,
-            genome = 'hg38',
-            sample.name = sample_id,
-            snp.data = snp_data,
-            plot = TRUE,
-            {params.extra_args}
-        )
-        
-        # Save main results
-        write.table(cnv_result\\$estimation_table, 
-                   '{output.estimation_table}', 
-                   sep='\\t', quote=FALSE, row.names=FALSE)
-        
-        # Save log2 fold change per chromosome arm
-        if('log2fc_per_arm' %in% names(cnv_result)) {{
-            write.table(cnv_result\\$log2fc_per_arm, 
-                       '{output.log2fc}', 
-                       sep='\\t', quote=FALSE)
-        }}
-        
-        # Save manual annotation table
-        if('manual_an_table' %in% names(cnv_result)) {{
-            write.table(cnv_result\\$manual_an_table, 
-                       '{output.manual_table}', 
-                       sep='\\t', quote=FALSE, row.names=FALSE)
-        }}
-        
-        # Create summary results file
-        cnv_summary <- data.frame(
-            sample_id = sample_id,
-            total_alterations = nrow(cnv_result\\$estimation_table),
-            gains = sum(cnv_result\\$estimation_table\\$call == 'gain', na.rm=TRUE),
-            losses = sum(cnv_result\\$estimation_table\\$call == 'loss', na.rm=TRUE),
-            neutral = sum(cnv_result\\$estimation_table\\$call == 'neutral', na.rm=TRUE)
-        )
-        
-        write.table(cnv_summary, '{output.results}', 
-                   sep='\\t', quote=FALSE, row.names=FALSE)
-        
-        # Copy plot if it exists
-        if(file.exists(paste0(sample_id, '_CNV_main_fig.png'))) {{
-            file.copy(paste0(sample_id, '_CNV_main_fig.png'), '{output.plot}')
-        }}
-        " &> {log}
-        
-        # Ensure all output files exist
-        touch {output.results} {output.plot} {output.log2fc} {output.manual_table} {output.estimation_table}
-        """
+    script:
+        "../scripts/modified_RNASeqCNV_wrapper.R"
 
 # Annotate CNV results with gene information
 rule annotate_cnvs:

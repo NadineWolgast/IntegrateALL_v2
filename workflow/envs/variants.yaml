@@ -28,6 +28,9 @@ dependencies:
   # SNV hotspot detection (CRITICAL for original classification)
   - pysamstats>=1.1.0
   
+  # Machine learning packages for ensemble classifier
+  - xgboost>=1.6.0
+  
   # Pip packages
   - pip
   - pip:

@@ -66,34 +66,19 @@ rule allcatchr:
         touch {output.predictions} {output.scores} {output.confidence}
         """
 
-# Karyotype prediction using original trained classifier
+# Karyotype prediction using ensemble classifier (CRITICAL for research validity)
 rule karyotype_prediction:
     input:
-        allcatchr_pred="results/classification/{sample}/allcatchr_predictions.tsv",
-        cnv_results="results/cnv/{sample}/rnaseqcnv_results.tsv",
-        fusioncatcher_results="results/fusions/{sample}/fusioncatcher_results.txt",
-        arriba_results="results/fusions/{sample}/arriba_fusions.tsv",
-        anno_gene_fusions="resources/databases/anno_gene_fusions.txt"
+        cnv_features="results/cnv/{sample}/cnv_features.csv",
+        ensemble_model="workflow/scripts/ensemble_classifier_250524.pkl"
     output:
         prediction="results/classification/{sample}/karyotype_prediction.csv"
-    params:
-        chromosome_counts_karyotype="resources/databases/chromosome_counts_karyotype.txt"
     log:
         "logs/classification/karyotype_{sample}.log"
     conda:
-        "../envs/classification.yaml"
-    shell:
-        """
-        Rscript workflow/scripts/predict_karyotype.R \\
-            {input.allcatchr_pred} \\
-            {input.cnv_results} \\
-            {input.fusioncatcher_results} \\
-            {input.arriba_results} \\
-            {params.chromosome_counts_karyotype} \\
-            {input.anno_gene_fusions} \\
-            {output.prediction} \\
-            > {log} 2>&1
-        """
+        "../envs/variants.yaml"  # Has required Python packages
+    script:
+        "../scripts/predict_karyotype_ensemble.py"
 
 # Integrative classification combining all results
 rule integrated_classification:
