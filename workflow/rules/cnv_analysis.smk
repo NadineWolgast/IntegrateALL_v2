@@ -29,8 +29,14 @@ rule rnaseqcnv:
         "benchmarks/cnv/rnaseqcnv_{sample}.benchmark.txt"
     conda:
         "../envs/cnv.yaml"
-    script:
-        "../scripts/modified_RNASeqCNV_wrapper.R"
+    shell:
+        """
+        # Install R packages if needed
+        Rscript install_r_bioconductor.R 2>/dev/null || true
+        
+        # Run RNASeqCNV wrapper
+        Rscript workflow/scripts/modified_RNASeqCNV_wrapper.R 2>&1 | tee {log}
+        """
 
 # Annotate CNV results with gene information
 rule annotate_cnvs:
