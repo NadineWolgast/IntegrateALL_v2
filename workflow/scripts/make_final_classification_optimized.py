@@ -74,7 +74,7 @@ def get_karyotype_and_probabilities(karyotype_file: str) -> Tuple[str, float]:
         print(f"Warning: Error reading karyotype file {karyotype_file}: {e}")
         return "other", 0.5
 
-def check_hotspot_files(hotspot_dir: str) -> Dict[str, bool]:
+def check_hotspot_files(hotspot_summary: str) -> Dict[str, bool]:
     """Check for SNV hotspot files - CRITICAL for classification."""
     relevant_files = {
         "PAX5_P80R": False,
@@ -83,17 +83,29 @@ def check_hotspot_files(hotspot_dir: str) -> Dict[str, bool]:
     }
     
     try:
-        if not os.path.exists(hotspot_dir):
+        if not os.path.exists(hotspot_summary):
             return relevant_files
             
-        hotspot_files = os.listdir(hotspot_dir)
-        for file in hotspot_files:
-            if file.startswith("PAX5_P80R"):
-                relevant_files["PAX5_P80R"] = True
-            elif file.startswith("IKZF1_N159Y"):
-                relevant_files["IKZF1_N159Y"] = True
-            elif file.startswith("ZEB2_H1038"):
-                relevant_files["ZEB2_H1038R"] = True
+        # Read hotspot summary CSV
+        import pandas as pd
+        hotspot_df = pd.read_csv(hotspot_summary)
+        
+        # Check if hotspots were detected
+        if 'hotspot' in hotspot_df.columns and 'detected' in hotspot_df.columns:
+            for _, row in hotspot_df.iterrows():
+                hotspot_name = row['hotspot']
+                detected = row['detected']
+                if hotspot_name in relevant_files and detected:
+                    relevant_files[hotspot_name] = True
+        else:
+            # Fallback: check if specific columns exist indicating detection
+            if 'PAX5_P80R' in hotspot_df.columns:
+                relevant_files["PAX5_P80R"] = hotspot_df['PAX5_P80R'].any()
+            if 'IKZF1_N159Y' in hotspot_df.columns:
+                relevant_files["IKZF1_N159Y"] = hotspot_df['IKZF1_N159Y'].any()
+            if 'ZEB2_H1038R' in hotspot_df.columns:
+                relevant_files["ZEB2_H1038R"] = hotspot_df['ZEB2_H1038R'].any()
+                
     except Exception as e:
         print(f"Warning: Error checking hotspot files: {e}")
     
@@ -125,13 +137,13 @@ def filter_fusions(fusion_genes: List[Tuple], unique_genes: List[str],
     return filtered_fusions
 
 def gather_data(allcatchr_file: str, karyotype_file: str, fusioncatcher_file: str, 
-               arriba_file: str, hotspot_dir: str, classification_file: str) -> pd.DataFrame:
+               arriba_file: str, hotspot_summary: str, classification_file: str) -> pd.DataFrame:
     """Gather all classification data - maintains original logic exactly."""
     
     # Extract data from input files
     subgruppe, confidence, bcr_abl1_maincluster_pred = get_allcatchr_data(allcatchr_file)
     karyotype, score = get_karyotype_and_probabilities(karyotype_file)
-    relevant_files = check_hotspot_files(hotspot_dir)
+    relevant_files = check_hotspot_files(hotspot_summary)
     
     fusion_genes = []
     
@@ -269,7 +281,7 @@ def main():
     karyotype_file = snakemake.input.karyotype_pred
     fusioncatcher_file = snakemake.input.fusioncatcher_results
     arriba_file = snakemake.input.arriba_results
-    hotspot_dir = snakemake.input.hotspot_dir
+    hotspot_summary = snakemake.input.hotspot_summary
     classification_file = snakemake.input.classification_rules
     
     # Outputs
@@ -285,7 +297,7 @@ def main():
         # Gather all data using original logic
         data_df = gather_data(
             allcatchr_file, karyotype_file, fusioncatcher_file,
-            arriba_file, hotspot_dir, classification_file
+            arriba_file, hotspot_summary, classification_file
         )
         
         # Load classification rules

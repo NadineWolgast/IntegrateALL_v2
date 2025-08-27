@@ -27,7 +27,7 @@ rule final_classification:
         karyotype_pred="results/classification/{sample}/karyotype_prediction.csv",
         fusioncatcher_results="results/fusions/{sample}/fusioncatcher_results.txt",
         arriba_results="results/fusions/{sample}/arriba_fusions.tsv",
-        hotspot_dir="results/variants/{sample}/hotspots",
+        hotspot_summary="results/variants/{sample}/snv_hotspots_summary.csv",
         classification_rules="resources/databases/Class_test.csv"
     output:
         final_report="results/classification/{sample}/final_classification_report.csv",
