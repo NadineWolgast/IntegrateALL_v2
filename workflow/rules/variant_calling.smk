@@ -102,8 +102,8 @@ rule gatk_baserecalibrator:
     input:
         bam="results/variants/{sample}/split/{sample}.bam",
         ref=config["reference_genome"],
-        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict"),
-        known=config.get("dbsnp_vcf", "resources/databases/dbSNP.vcf")
+        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict")
+        # known sites removed - optional in original pipeline
     output:
         recal_table=temp("results/variants/{sample}/recal/{sample}_recal.table")
     log:
