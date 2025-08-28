@@ -20,8 +20,8 @@ rule detect_snv_hotspots:
     script:
         "../scripts/detect_snv_hotspots.py"
 
-# Final Classification using original algorithm
-rule final_classification:
+# Final Classification using original algorithm (renamed to avoid conflict)
+rule original_final_classification:
     input:
         allcatchr_pred="results/classification/{sample}/allcatchr_predictions.tsv",
         karyotype_pred="results/classification/{sample}/karyotype_prediction.csv",

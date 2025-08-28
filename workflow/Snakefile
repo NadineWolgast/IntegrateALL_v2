@@ -24,7 +24,6 @@ include: "rules/fusion_detection.smk"
 include: "rules/variant_calling.smk"
 include: "rules/cnv_analysis.smk"
 include: "rules/classification.smk"
-include: "rules/original_classification.smk"  # CRITICAL: Original research validation
 include: "rules/reporting.smk"
 include: "rules/installation.smk"
 
