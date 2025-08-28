@@ -82,43 +82,32 @@ rule star_align:
         "../envs/alignment.yaml"
     shell:
         """
-        # Create output directory
-        mkdir -p $(dirname {params.output_prefix})
-        
-        # Run STAR alignment
-        STAR \\
+        # Create output directory  
+        mkdir -p $(dirname {params.output_prefix}) && 
+        sleep .10;
+        STAR --runThreadN {threads} \\
             --runMode alignReads \\
-            --runThreadN {threads} \\
             --genomeDir {input.index} \\
             --readFilesIn {input.fastq1} {input.fastq2} \\
-            --readFilesCommand {params.read_files_command} \\
             --outFileNamePrefix {params.output_prefix} \\
-            --outSAMtype BAM SortedByCoordinate \\
-            --outSAMunmapped Within \\
-            --outSAMattributes Standard \\
-            --outSAMstrandField intronMotif \\
             --quantMode GeneCounts \\
-            --twopassMode {params.two_pass_mode} \\
-            --chimSegmentMin {params.chim_segment_min} \\
-            --chimJunctionOverhangMin {params.chim_junction_overhang_min} \\
-            --chimOutType Junctions WithinBAM SeparateSAMold \\
-            --chimMainSegmentMultNmax 1 \\
-            --outFilterMultimapNmax {params.outFilterMultimapNmax} \\
-            --outFilterMismatchNmax {params.outFilterMismatchNmax} \\
-            --outFilterMismatchNoverReadLmax {params.outFilterMismatchNoverReadLmax} \\
-            --alignIntronMin {params.alignIntronMin} \\
-            --alignIntronMax {params.alignIntronMax} \\
-            --alignMatesGapMax {params.alignMatesGapMax} \\
-            --alignSJDBoverhangMin {params.alignSJDBoverhangMin} \\
-            {params.extra_args} \\
-            &> {log}
+            --sjdbOverhang 100 \\
+            --twopassMode Basic \\
+            --outSAMtype BAM SortedByCoordinate \\
+            --genomeLoad NoSharedMemory \\
+            --outFilterMultimapNmax 10 \\
+            --chimOutType WithinBAM \\
+            --chimSegmentMin 10 \\
+            --readFilesCommand zcat \\
+            &> {log} && 
+        rm -r {params.output_prefix}_STARgenome {params.output_prefix}_STARpass1 || true &&
         
         # Rename output files to match expected names
-        mv {params.output_prefix}Aligned.sortedByCoord.out.bam {output.bam}
-        mv {params.output_prefix}ReadsPerGene.out.tab {output.gene_counts}
+        mv {params.output_prefix}Aligned.sortedByCoord.out.bam {output.bam} &&
+        mv {params.output_prefix}ReadsPerGene.out.tab {output.gene_counts} &&
         
         # Index BAM file
-        samtools index {output.bam} {output.bai}
+        samtools index {output.bam}
         """
 
 rule flagstat:

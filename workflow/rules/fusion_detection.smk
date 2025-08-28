@@ -98,12 +98,11 @@ rule fusioncatcher:
         # Create output directory
         mkdir -p {output.dir}
         
-        # Run FusionCatcher
+        # Run FusionCatcher (EXACT original parameters)
         fusioncatcher \\
-            --data {params.data_dir} \\
-            --input {input.fastq1},{input.fastq2} \\
-            --output {output.dir} \\
-            --threads {threads} \\
+            -d {params.data_dir} \\
+            -i {input.fastq1},{input.fastq2} \\
+            -o {output.dir} \\
             {params.extra_args} \\
             &> {log}
         

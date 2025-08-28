@@ -80,28 +80,29 @@ rule karyotype_prediction:
     script:
         "../scripts/predict_karyotype_ensemble.py"
 
-# Integrative classification combining all results
-rule integrated_classification:
+# Original final classification (CRITICAL - exact copy from original pipeline)
+rule final_classification:
     input:
-        allcatchr_pred="results/classification/{sample}/allcatchr_predictions.tsv",
-        allcatchr_scores="results/classification/{sample}/allcatchr_scores.tsv",
-        karyotype_pred="results/classification/{sample}/karyotype_prediction.csv",
-        fusion_results="results/fusions/{sample}/driver_fusions.tsv",
-        cnv_results="results/cnv/{sample}/rnaseqcnv_results.tsv",
-        hotspot_results="results/variants/{sample}/hotspots.csv"
+        allcatchr_file="results/classification/{sample}/allcatchr_predictions.tsv",
+        karyotype="results/classification/{sample}/karyotype_prediction.csv",
+        fusioncatcher_file="results/fusions/{sample}/fusioncatcher_output/final-list_candidate-fusion-genes.txt",
+        arriba_file="results/fusions/{sample}/arriba_fusions.tsv",
+        hotspots="results/variants/{sample}/hotspots",
+        classification_file=config.get("classification_rules", "resources/databases/Class_test.csv")
     output:
-        classification="results/classification/{sample}/integrated_classification.json",
-        confidence="results/classification/{sample}/classification_confidence.json",
-        evidence="results/classification/{sample}/classification_evidence.tsv"
-    params:
-        classification_rules=config.get("classification_rules", "resources/classification_rules.yaml"),
-        confidence_threshold=config.get("classification_confidence_threshold", 0.7)
+        csv="results/classification/{sample}/final_classification_report.csv",
+        text="results/classification/{sample}/classification_output_txt.csv",
+        driver="results/classification/{sample}/driver_fusions.csv",
+        curation="results/classification/{sample}/curation_summary.csv"
+    resources:
+        mem_mb=4000,
+        runtime=60
     log:
-        "logs/classification/integrated_{sample}.log"
-    conda:
-        "../envs/python.yaml"
-    script:
-        "../scripts/integrated_classification.py"
+        "logs/classification/final_classification_{sample}.log"
+    shell:
+        """
+        python workflow/scripts/make_final_classification_new.py {wildcards.sample} {input.allcatchr_file} {input.karyotype} {input.fusioncatcher_file} {input.arriba_file} {input.hotspots} {input.classification_file} {output.csv} {output.text} {output.curation} {output.driver} &> {log}
+        """
 
 # Subtype-specific analysis
 rule subtype_analysis:

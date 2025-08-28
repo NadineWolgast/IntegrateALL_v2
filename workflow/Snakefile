@@ -50,10 +50,9 @@ rule all:
         # Alignment QC
         expand("results/alignment/{sample}/{sample}.flagstat", sample=SAMPLES),
         
-        # Fusion detection
+        # Fusion detection (BOTH enabled for comprehensive detection!)
         expand("results/fusions/{sample}/arriba_fusions.tsv", sample=SAMPLES),
-        # FusionCatcher disabled due to installation issues
-        # expand("results/fusions/{sample}/fusioncatcher_results.txt", sample=SAMPLES),
+        expand("results/fusions/{sample}/fusioncatcher_results.txt", sample=SAMPLES),
         
         # Classification
         expand("results/classification/{sample}/allcatchr_predictions.tsv", sample=SAMPLES),
@@ -65,8 +64,8 @@ rule all:
         # Variant calling
         expand("results/variants/{sample}/filtered_variants.vcf", sample=SAMPLES),
         
-        # SNV Hotspot detection (CRITICAL for classification)
-        expand("results/variants/{sample}/snv_hotspots_summary.csv", sample=SAMPLES),
+        # Original hotspot detection (CRITICAL - 37 B-ALL mutations)
+        expand("results/variants/{sample}/hotspots", sample=SAMPLES),
         
         # Original classification system (CRITICAL for research validity)
         expand("results/classification/{sample}/final_classification_report.csv", sample=SAMPLES),

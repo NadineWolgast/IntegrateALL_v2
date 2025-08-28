@@ -31,126 +31,153 @@ rule prepare_reference:
             &> {log}
         """
 
+# Add read groups first (CRITICAL - missing from new pipeline!)
+rule replace_rg:
+    input:
+        "results/alignment/{sample}/{sample}.sorted.bam"
+    output:
+        temp("results/variants/{sample}/fixed-rg/{sample}.bam")
+    log:
+        "logs/variants/replace_rg_{sample}.log"
+    params:
+        extra="--RGLB lib1 --RGPL illumina --RGPU {sample} --RGSM {sample}",
+        java_opts=""
+    resources:
+        mem_mb=2048,
+        runtime=60
+    wrapper:
+        "v3.10.2/bio/picard/addorreplacereadgroups"
+
 # Mark duplicates
 rule mark_duplicates:
     input:
-        bam="results/alignment/{sample}/{sample}.sorted.bam"
+        bams="results/variants/{sample}/fixed-rg/{sample}.bam"
     output:
-        bam="results/variants/{sample}/marked_duplicates.bam",
-        metrics="results/variants/{sample}/duplicate_metrics.txt"
-    resources:
-        mem_mb=config.get("picard_memory", 16000),
-        runtime=config.get("picard_runtime", 120)
+        bam=temp("results/variants/{sample}/deduped_bam/{sample}.bam"),
+        metrics=temp("results/variants/{sample}/deduped_bam/{sample}.metrics.txt")
     log:
         "logs/variants/mark_duplicates_{sample}.log"
-    benchmark:
-        "benchmarks/variants/mark_duplicates_{sample}.benchmark.txt"
-    conda:
-        "../envs/variants.yaml"
-    shell:
-        """
-        mkdir -p $(dirname {output.bam})
-        
-        picard MarkDuplicates \\
-            I={input.bam} \\
-            O={output.bam} \\
-            M={output.metrics} \\
-            VALIDATION_STRINGENCY=LENIENT \\
-            ASSUME_SORT_ORDER=coordinate \\
-            &> {log}
-        
-        # Index the output BAM
-        samtools index {output.bam}
-        """
+    resources:
+        mem_mb=5000,
+        runtime=120
+    wrapper:
+        "v3.10.2/bio/picard/markduplicates"
+
+# Index BAM file
+rule index_bam:
+    input:
+        "results/variants/{sample}/deduped_bam/{sample}.bam"
+    output:
+        temp("results/variants/{sample}/deduped_bam/{sample}.bam.bai")
+    log:
+        "logs/variants/index_bam_{sample}.log"
+    params:
+        extra=""
+    threads: 4
+    wrapper:
+        "v3.10.2/bio/samtools/index"
 
 # Split reads that contain Ns in their cigar string
-rule split_n_cigar:
+rule splitncigarreads:
     input:
-        bam="results/variants/{sample}/marked_duplicates.bam",
-        ref=config["reference_genome"],
-        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict")
+        bam="results/variants/{sample}/deduped_bam/{sample}.bam",
+        bai="results/variants/{sample}/deduped_bam/{sample}.bam.bai",
+        ref=config["reference_genome"]
     output:
-        bam="results/variants/{sample}/split_reads.bam"
-    resources:
-        mem_mb=config.get("gatk_memory", 16000),
-        runtime=config.get("gatk_runtime", 180)
+        temp("results/variants/{sample}/split/{sample}.bam")
     log:
-        "logs/variants/split_n_cigar_{sample}.log"
-    benchmark:
-        "benchmarks/variants/split_n_cigar_{sample}.benchmark.txt"
-    conda:
-        "../envs/variants.yaml"
-    shell:
-        """
-        gatk SplitNCigarReads \\
-            -R {input.ref} \\
-            -I {input.bam} \\
-            -O {output.bam} \\
-            &> {log}
-        """
+        "logs/variants/splitncigarreads_{sample}.log"
+    params:
+        extra="",
+        java_opts=""
+    resources:
+        mem_mb=5000,
+        runtime=180
+    threads: 4
+    wrapper:
+        "v3.10.2/bio/gatk/splitncigarreads"
+
+# Base recalibrator
+rule gatk_baserecalibrator:
+    input:
+        bam="results/variants/{sample}/split/{sample}.bam",
+        ref=config["reference_genome"],
+        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict"),
+        known=config.get("dbsnp_vcf", "resources/databases/dbSNP.vcf")
+    output:
+        recal_table=temp("results/variants/{sample}/recal/{sample}_recal.table")
+    log:
+        "logs/variants/baserecalibrator_{sample}.log"
+    params:
+        extra="",
+        java_opts=""
+    resources:
+        mem_mb=5000,
+        runtime=120
+    threads: 4
+    wrapper:
+        "v3.10.2/bio/gatk/baserecalibrator"
+
+# Apply base recalibration
+rule gatk_applybqsr:
+    input:
+        bam="results/variants/{sample}/split/{sample}.bam",
+        ref=config["reference_genome"],
+        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict"),
+        recal_table="results/variants/{sample}/recal/{sample}_recal.table"
+    output:
+        bam=temp("results/variants/{sample}/recal/{sample}.bam")
+    log:
+        "logs/variants/applybqsr_{sample}.log"
+    params:
+        extra="",
+        java_opts="",
+        embed_ref=True
+    resources:
+        mem_mb=5000,
+        runtime=120
+    threads: 4
+    wrapper:
+        "v3.10.2/bio/gatk/applybqsr"
 
 # Call variants with HaplotypeCaller
-rule call_variants:
+rule haplotype_caller:
     input:
-        bam="results/variants/{sample}/split_reads.bam",
-        ref=config["reference_genome"],
-        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict")
+        bam="results/variants/{sample}/recal/{sample}.bam",
+        ref=config["reference_genome"]
     output:
-        vcf="results/variants/{sample}/raw_variants.vcf"
-    params:
-        extra_args=config.get("haplotype_caller_args", ""),
-        dont_use_soft_clipped_bases=config.get("gatk_dont_use_soft_clipped", True),
-        standard_min_confidence_threshold=config.get("gatk_min_confidence", 20.0)
-    resources:
-        mem_mb=config.get("gatk_memory", 16000),
-        runtime=config.get("gatk_runtime", 240)
+        vcf=temp("results/variants/{sample}/calls/{sample}.vcf")
     log:
-        "logs/variants/call_variants_{sample}.log"
-    benchmark:
-        "benchmarks/variants/call_variants_{sample}.benchmark.txt"
-    conda:
-        "../envs/variants.yaml"
-    shell:
-        """
-        gatk HaplotypeCaller \\
-            -R {input.ref} \\
-            -I {input.bam} \\
-            -O {output.vcf} \\
-            --dont-use-soft-clipped-bases {params.dont_use_soft_clipped_bases} \\
-            --standard-min-confidence-threshold-for-calling {params.standard_min_confidence_threshold} \\
-            {params.extra_args} \\
-            &> {log}
-        """
+        "logs/variants/haplotypecaller_{sample}.log"
+    params:
+        extra="-ERC GVCF --output-mode EMIT_ALL_CONFIDENT_SITES --dont-use-soft-clipped-bases -stand-call-conf 20.0",
+        java_opts=""
+    threads: 4
+    resources:
+        mem_mb=10000,
+        runtime=240
+    wrapper:
+        "v3.10.2/bio/gatk/haplotypecaller"
 
 # Filter variants
-rule filter_variants:
+rule gatk_filter:
     input:
-        vcf="results/variants/{sample}/raw_variants.vcf",
+        vcf="results/variants/{sample}/calls/{sample}.vcf",
         ref=config["reference_genome"]
     output:
         vcf="results/variants/{sample}/filtered_variants.vcf"
-    params:
-        filter_expression=config.get("variant_filter_expression", "QD < 2.0 || FS > 60.0 || SOR > 3.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0"),
-        filter_name=config.get("variant_filter_name", "basic_filter")
-    resources:
-        mem_mb=config.get("gatk_memory", 8000),
-        runtime=60
     log:
-        "logs/variants/filter_variants_{sample}.log"
-    benchmark:
-        "benchmarks/variants/filter_variants_{sample}.benchmark.txt"
-    conda:
-        "../envs/variants.yaml"
-    shell:
-        """
-        gatk VariantFiltration \\
-            -R {input.ref} \\
-            -V {input.vcf} \\
-            -O {output.vcf} \\
-            --filter-expression "{params.filter_expression}" \\
-            --filter-name {params.filter_name} \\
-            &> {log}
-        """
+        "logs/variants/gatk_filter_{sample}.log"
+    params:
+        filters={"myfilter": "AB < 0.2 || MQ0 > 50"},
+        extra="",
+        java_opts=""
+    resources:
+        mem_mb=5000,
+        runtime=60
+    threads: 4
+    wrapper:
+        "v3.10.2/bio/gatk/variantfiltration"
 
 # Annotate variants with VEP or SnpEff
 rule annotate_variants:
@@ -199,22 +226,43 @@ rule annotate_variants:
             &> {log}
         """
 
-# Hotspot analysis for known B-ALL mutations
-rule hotspot_analysis:
+# Original pysamstats hotspot detection (CRITICAL for B-ALL classification)
+rule pysamstat:
     input:
-        vcf="results/variants/{sample}/annotated_variants.vcf"
+        bam="results/alignment/{sample}/{sample}.sorted.bam",
+        bai="results/alignment/{sample}/{sample}.sorted.bam.bai", 
+        fa=config["reference_genome"]
     output:
-        hotspots="results/variants/{sample}/hotspots.csv",
-        summary="results/variants/{sample}/hotspot_summary.json"
+        pysamstats_output_dir=temp(directory("results/variants/{sample}/pysamstats_output_dir/{sample}/")),
+        ikzf1="results/variants/{sample}/pysamstats_output_dir/{sample}/{sample}_IKZF1.csv"
     params:
-        hotspot_bed=config.get("hotspot_regions", "resources/databases/ball_hotspots.bed"),
-        driver_genes=config.get("driver_gene_list", "resources/databases/driver_genes.txt")
-    log:
-        "logs/variants/hotspot_analysis_{sample}.log"
+        out_dir="results/variants/{sample}/pysamstats_output_dir/{sample}/"
     conda:
-        "../envs/python.yaml"
-    script:
-        "../scripts/analyze_hotspots.py"
+        "../envs/variants.yaml"
+    threads: 4
+    resources:
+        mem_mb=20000,
+        runtime=120
+    shell:
+        """
+        mkdir -p {output.pysamstats_output_dir} &&
+        pysamstats --type variation --chromosome 7 -u --start 50382593 --end 50382596 -f {input.fa} {input.bam} > {output.ikzf1} &&
+        python workflow/scripts/run_pysamstats_original.py {input.bam} {input.fa} {wildcards.sample} {params.out_dir} 
+        """
+
+# Get hotspots using original R script
+rule get_hotspots:
+    input:
+        pysamstats_output_dir="results/variants/{sample}/pysamstats_output_dir/{sample}/",
+        gatk_file="results/variants/{sample}/filtered_variants.vcf"
+    output:
+        hotspot_output_dir=directory("results/variants/{sample}/hotspots")
+    shell:
+        """
+        mkdir -p {output.hotspot_output_dir} &&
+        cp /media/nadine/InternalMaybe/Blast-o-Matic-Fusioninator_cluster/scripts/Get_Amino_for_Hotspot.R workflow/scripts/ &&
+        Rscript workflow/scripts/Get_Amino_for_Hotspot.R {input.pysamstats_output_dir} {input.gatk_file} {output.hotspot_output_dir}
+        """
 
 # Variant quality control
 rule variant_qc:
