@@ -56,6 +56,7 @@ rule mark_duplicates:
             O={output.bam} \\
             M={output.metrics} \\
             VALIDATION_STRINGENCY=LENIENT \\
+            ASSUME_SORT_ORDER=coordinate \\
             &> {log}
         
         # Index the output BAM
