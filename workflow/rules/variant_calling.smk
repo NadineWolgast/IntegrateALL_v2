@@ -97,13 +97,29 @@ rule splitncigarreads:
     wrapper:
         "v3.10.2/bio/gatk/splitncigarreads"
 
-# Base recalibrator
+# Download dbSNP and reference files (CRITICAL - needed for BaseRecalibrator)
+rule download_gatk_references:
+    output:
+        vcf="resources/databases/dbSNP.vcf",
+        ref_fa="resources/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+    shell:
+        """
+        mkdir -p resources/databases resources/genomes &&
+        cd resources &&
+        wget 'http://141.2.194.197/rnaeditor_annotations/GRCH38.tar.gz' &&
+        tar -xzf GRCH38.tar.gz &&
+        cp GRCH38/dbSNP.vcf databases/ &&
+        cp GRCH38/Homo_sapiens.GRCh38.dna.primary_assembly.fa genomes/ &&
+        rm -rf GRCH38 GRCH38.tar.gz
+        """
+
+# Base recalibrator (NOW with dbSNP!)
 rule gatk_baserecalibrator:
     input:
         bam="results/variants/{sample}/split/{sample}.bam",
         ref=config["reference_genome"],
-        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict")
-        # known sites removed - optional in original pipeline
+        dict=config["reference_genome"].replace(".fa", ".dict").replace(".fasta", ".dict"),
+        known="resources/databases/dbSNP.vcf"
     output:
         recal_table=temp("results/variants/{sample}/recal/{sample}_recal.table")
     log:
